@@ -2,12 +2,13 @@
 # =============================================================================
 # setup_custom_tls.sh - Configure custom TLS certificates for Caddy
 # =============================================================================
-# Generates caddy-addon/custom-tls.conf for using corporate/internal certificates
+# Updates caddy-addon/tls-snippet.conf to use corporate/internal certificates
 # instead of Let's Encrypt.
 #
 # Usage:
 #   bash scripts/setup_custom_tls.sh                    # Interactive mode
 #   bash scripts/setup_custom_tls.sh cert.crt key.key   # Non-interactive mode
+#   bash scripts/setup_custom_tls.sh --remove           # Reset to Let's Encrypt
 #
 # Prerequisites:
 #   - Place certificate files in ./certs/ directory
@@ -18,12 +19,26 @@ set -euo pipefail
 
 source "$(dirname "$0")/utils.sh" && init_paths
 
-ADDON_FILE="$PROJECT_ROOT/caddy-addon/custom-tls.conf"
+SNIPPET_FILE="$PROJECT_ROOT/caddy-addon/tls-snippet.conf"
+SNIPPET_EXAMPLE="$PROJECT_ROOT/caddy-addon/tls-snippet.conf.example"
 CERTS_DIR="$PROJECT_ROOT/certs"
+
+# Legacy file that causes duplicate host errors (must be cleaned up on migration)
+# TODO: Remove OLD_CONFIG and cleanup_legacy_config() after v3.0 release (all users migrated)
+OLD_CONFIG="$PROJECT_ROOT/caddy-addon/custom-tls.conf"
 
 # =============================================================================
 # FUNCTIONS
 # =============================================================================
+
+cleanup_legacy_config() {
+    # Remove old custom-tls.conf that causes duplicate host errors
+    # This is needed for users upgrading from older versions
+    if [[ -f "$OLD_CONFIG" ]]; then
+        log_warning "Removing obsolete custom-tls.conf (causes duplicate host errors)"
+        rm -f "$OLD_CONFIG"
+    fi
+}
 
 show_help() {
     cat << EOF
@@ -33,7 +48,7 @@ Usage: $(basename "$0") [OPTIONS] [CERT_FILE] [KEY_FILE]
 
 Options:
   -h, --help     Show this help message
-  --remove       Remove custom TLS configuration
+  --remove       Reset to Let's Encrypt automatic certificates
 
 Arguments:
   CERT_FILE      Path to certificate file (relative to ./certs/)
@@ -42,13 +57,12 @@ Arguments:
 Examples:
   $(basename "$0")                           # Interactive mode
   $(basename "$0") wildcard.crt wildcard.key # Use specific files
-  $(basename "$0") --remove                  # Remove custom TLS config
+  $(basename "$0") --remove                  # Reset to Let's Encrypt
 
 The script will:
 1. Detect certificate files in ./certs/
-2. Read active services from .env
-3. Generate caddy-addon/custom-tls.conf
-4. Optionally restart Caddy
+2. Update caddy-addon/tls-snippet.conf with your certificate paths
+3. Optionally restart Caddy
 
 EOF
 }
@@ -75,157 +89,53 @@ find_keys() {
     echo "${keys[*]:-}"
 }
 
-get_active_services() {
-    # Get list of services with their hostnames from .env
-    load_env
-    local services=()
-
-    # Map of service names to their hostname variables
-    declare -A service_map=(
-        ["n8n"]="N8N_HOSTNAME"
-        ["flowise"]="FLOWISE_HOSTNAME"
-        ["webui"]="WEBUI_HOSTNAME"
-        ["grafana"]="GRAFANA_HOSTNAME"
-        ["prometheus"]="PROMETHEUS_HOSTNAME"
-        ["portainer"]="PORTAINER_HOSTNAME"
-        ["langfuse"]="LANGFUSE_HOSTNAME"
-        ["supabase"]="SUPABASE_HOSTNAME"
-        ["dify"]="DIFY_HOSTNAME"
-        ["nocodb"]="NOCODB_HOSTNAME"
-        ["ragapp"]="RAGAPP_HOSTNAME"
-        ["ragflow"]="RAGFLOW_HOSTNAME"
-        ["waha"]="WAHA_HOSTNAME"
-        ["searxng"]="SEARXNG_HOSTNAME"
-        ["comfyui"]="COMFYUI_HOSTNAME"
-        ["welcome"]="WELCOME_HOSTNAME"
-        ["databasus"]="DATABASUS_HOSTNAME"
-        ["letta"]="LETTA_HOSTNAME"
-        ["lightrag"]="LIGHTRAG_HOSTNAME"
-        ["weaviate"]="WEAVIATE_HOSTNAME"
-        ["qdrant"]="QDRANT_HOSTNAME"
-        ["neo4j"]="NEO4J_HOSTNAME"
-        ["postiz"]="POSTIZ_HOSTNAME"
-        ["libretranslate"]="LT_HOSTNAME"
-        ["paddleocr"]="PADDLEOCR_HOSTNAME"
-        ["docling"]="DOCLING_HOSTNAME"
-    )
-
-    for service in "${!service_map[@]}"; do
-        local hostname_var="${service_map[$service]}"
-        local hostname="${!hostname_var:-}"
-        if [[ -n "$hostname" && "$hostname" != *"yourdomain.com" ]]; then
-            services+=("$service:$hostname")
+ensure_snippet_exists() {
+    # Create tls-snippet.conf from example if it doesn't exist
+    # This ensures the file survives git updates (it's gitignored)
+    if [[ ! -f "$SNIPPET_FILE" ]]; then
+        if [[ -f "$SNIPPET_EXAMPLE" ]]; then
+            cp "$SNIPPET_EXAMPLE" "$SNIPPET_FILE"
+            log_info "Created tls-snippet.conf from template"
+        else
+            # Fallback: create default content directly
+            remove_config
         fi
-    done
-
-    echo "${services[*]:-}"
+    fi
 }
 
 generate_config() {
     local cert_file="$1"
     local key_file="$2"
-    local services=("${@:3}")
 
-    cat > "$ADDON_FILE" << 'HEADER'
-# Custom TLS Configuration
-# Generated by setup_custom_tls.sh
-#
-# This file overrides default Let's Encrypt certificates with custom ones.
-# Regenerate with: make setup-tls
+    cat > "$SNIPPET_FILE" << EOF
+# TLS Configuration Snippet
+# Generated by setup_custom_tls.sh on $(date -Iseconds)
+# Using custom certificates instead of Let's Encrypt.
+# Reset to Let's Encrypt: make setup-tls --remove
 
-# Reusable TLS snippet
-(custom_tls) {
-HEADER
+(service_tls) {
+    tls /etc/caddy/certs/$cert_file /etc/caddy/certs/$key_file
+}
+EOF
 
-    echo "    tls /etc/caddy/certs/$cert_file /etc/caddy/certs/$key_file" >> "$ADDON_FILE"
-    echo "}" >> "$ADDON_FILE"
-    echo "" >> "$ADDON_FILE"
-
-    # Service-specific reverse proxy mappings
-    declare -A proxy_map=(
-        ["n8n"]="n8n:5678"
-        ["flowise"]="flowise:3001"
-        ["webui"]="open-webui:8080"
-        ["grafana"]="grafana:3000"
-        ["prometheus"]="prometheus:9090"
-        ["portainer"]="portainer:9000"
-        ["langfuse"]="langfuse-web:3000"
-        ["supabase"]="kong:8000"
-        ["dify"]="nginx:80"
-        ["nocodb"]="nocodb:8080"
-        ["ragapp"]="ragapp:8000"
-        ["ragflow"]="ragflow:80"
-        ["waha"]="waha:3000"
-        ["searxng"]="searxng:8080"
-        ["comfyui"]="comfyui:8188"
-        ["welcome"]="file_server"
-        ["databasus"]="databasus:4005"
-        ["letta"]="letta:8283"
-        ["lightrag"]="lightrag:9621"
-        ["weaviate"]="weaviate:8080"
-        ["qdrant"]="qdrant:6333"
-        ["neo4j"]="neo4j:7474"
-        ["postiz"]="postiz:5000"
-        ["libretranslate"]="libretranslate:5000"
-        ["paddleocr"]="paddleocr:8080"
-        ["docling"]="docling:5001"
-    )
-
-    # Services that need basic auth (format: USERNAME_VAR:PASSWORD_HASH_VAR)
-    declare -A auth_services=(
-        ["prometheus"]="PROMETHEUS_USERNAME:PROMETHEUS_PASSWORD_HASH"
-        ["ragapp"]="RAGAPP_USERNAME:RAGAPP_PASSWORD_HASH"
-        ["comfyui"]="COMFYUI_USERNAME:COMFYUI_PASSWORD_HASH"
-        ["welcome"]="WELCOME_USERNAME:WELCOME_PASSWORD_HASH"
-        ["libretranslate"]="LT_USERNAME:LT_PASSWORD_HASH"
-        ["paddleocr"]="PADDLEOCR_USERNAME:PADDLEOCR_PASSWORD_HASH"
-        ["docling"]="DOCLING_USERNAME:DOCLING_PASSWORD_HASH"
-    )
-
-    for service_entry in "${services[@]}"; do
-        local service="${service_entry%%:*}"
-        local hostname="${service_entry#*:}"
-        local proxy="${proxy_map[$service]:-}"
-
-        [[ -z "$proxy" ]] && continue
-
-        echo "# $service" >> "$ADDON_FILE"
-        echo "$hostname {" >> "$ADDON_FILE"
-        echo "    import custom_tls" >> "$ADDON_FILE"
-
-        # Add basic auth if needed
-        if [[ -n "${auth_services[$service]:-}" ]]; then
-            local auth_config="${auth_services[$service]}"
-            local username_var="${auth_config%%:*}"
-            local password_hash_var="${auth_config#*:}"
-            echo "    basic_auth {" >> "$ADDON_FILE"
-            echo "        {\$${username_var}} {\$${password_hash_var}}" >> "$ADDON_FILE"
-            echo "    }" >> "$ADDON_FILE"
-        fi
-
-        # Add reverse proxy or file server
-        if [[ "$proxy" == "file_server" ]]; then
-            echo "    root * /srv/welcome" >> "$ADDON_FILE"
-            echo "    file_server" >> "$ADDON_FILE"
-            echo "    try_files {path} /index.html" >> "$ADDON_FILE"
-        else
-            echo "    reverse_proxy $proxy" >> "$ADDON_FILE"
-        fi
-
-        echo "}" >> "$ADDON_FILE"
-        echo "" >> "$ADDON_FILE"
-    done
-
-    log_success "Generated $ADDON_FILE"
+    log_success "Generated $SNIPPET_FILE"
 }
 
 remove_config() {
-    if [[ -f "$ADDON_FILE" ]]; then
-        rm -f "$ADDON_FILE"
-        log_success "Removed custom TLS configuration"
-    else
-        log_info "No custom TLS configuration found"
-    fi
+    cat > "$SNIPPET_FILE" << 'EOF'
+# TLS Configuration Snippet
+# Imported by all service blocks in the main Caddyfile.
+#
+# Default: Empty (uses Let's Encrypt automatic certificates)
+# Custom: Overwritten by 'make setup-tls' with your certificate paths
+# Reset: Run 'make setup-tls --remove' to restore Let's Encrypt
+
+(service_tls) {
+    # Default: Let's Encrypt automatic certificates (empty = no override)
+}
+EOF
+
+    log_success "Reset to Let's Encrypt (automatic certificates)"
 }
 
 restart_caddy() {
@@ -250,11 +160,18 @@ main() {
             exit 0
             ;;
         --remove)
+            cleanup_legacy_config
             remove_config
             restart_caddy
             exit 0
             ;;
     esac
+
+    # Clean up legacy config that causes duplicate hosts
+    cleanup_legacy_config
+
+    # Ensure snippet file exists (survives git updates)
+    ensure_snippet_exists
 
     # Ensure certs directory exists
     mkdir -p "$CERTS_DIR"
@@ -319,29 +236,12 @@ main() {
     log_info "Using certificate: $cert_file"
     log_info "Using key: $key_file"
 
-    # Get active services
-    local services_arr
-    IFS=' ' read -ra services_arr <<< "$(get_active_services)"
-
-    if [[ ${#services_arr[@]} -eq 0 ]]; then
-        log_warning "No services with configured hostnames found in .env"
-        log_info "Make sure to update *_HOSTNAME variables in .env with your domain"
-        exit 1
-    fi
-
-    log_info "Found ${#services_arr[@]} services with configured hostnames"
-
     # Generate configuration
-    generate_config "$cert_file" "$key_file" "${services_arr[@]}"
+    generate_config "$cert_file" "$key_file"
 
-    # Show summary
     echo ""
-    log_info "Configuration generated for the following services:"
-    for service_entry in "${services_arr[@]}"; do
-        local service="${service_entry%%:*}"
-        local hostname="${service_entry#*:}"
-        echo "  - $service: $hostname"
-    done
+    log_info "Custom TLS configured successfully!"
+    log_info "All services will use: /etc/caddy/certs/$cert_file"
     echo ""
 
     # Restart Caddy

@@ -15,6 +15,23 @@ All `.conf` files in this directory are automatically imported via `import /etc/
 
 For corporate/internal deployments where Let's Encrypt is not available, you can use your own certificates.
 
+### How It Works
+
+The main `Caddyfile` imports a TLS snippet that all service blocks use:
+
+```caddy
+# In Caddyfile (top)
+import /etc/caddy/addons/tls-snippet.conf
+
+# In each service block
+{$N8N_HOSTNAME} {
+    import service_tls    # <-- Uses the snippet
+    reverse_proxy n8n:5678
+}
+```
+
+By default, the snippet is empty (Let's Encrypt is used). When you run `make setup-tls`, the snippet is updated with your certificate paths.
+
 ### Quick Setup
 
 1. Place your certificates in the `certs/` directory:
@@ -28,42 +45,22 @@ For corporate/internal deployments where Let's Encrypt is not available, you can
    make setup-tls
    ```
 
-3. Restart Caddy:
-   ```bash
-   docker compose -p localai restart caddy
-   ```
+3. The script will:
+   - Update `caddy-addon/tls-snippet.conf` with your certificate paths
+   - Optionally restart Caddy to apply changes
 
-### Manual Setup
+### Reset to Let's Encrypt
 
-1. Copy the example file:
-   ```bash
-   cp caddy-addon/custom-tls.conf.example caddy-addon/custom-tls.conf
-   ```
+To switch back to automatic Let's Encrypt certificates:
 
-2. Edit `custom-tls.conf` with your hostnames and certificate paths
-
-3. Place certificates in `certs/` directory
-
-4. Restart Caddy:
-   ```bash
-   docker compose -p localai restart caddy
-   ```
-
-## How Site Override Works
-
-When you define a site block in an addon file with the same hostname as the main Caddyfile, Caddy will use **both** configurations. To completely override a site, use the exact same hostname.
-
-Example: To override `n8n.yourdomain.com` with a custom certificate:
-
-```
-# caddy-addon/custom-tls.conf
-n8n.internal.company.com {
-    tls /etc/caddy/certs/wildcard.crt /etc/caddy/certs/wildcard.key
-    reverse_proxy n8n:5678
-}
+```bash
+make setup-tls --remove
 ```
 
-Make sure your `.env` file has `N8N_HOSTNAME=n8n.internal.company.com`.
+Or run directly:
+```bash
+bash scripts/setup_custom_tls.sh --remove
+```
 
 ## File Structure
 
@@ -71,8 +68,9 @@ Make sure your `.env` file has `N8N_HOSTNAME=n8n.internal.company.com`.
 caddy-addon/
 ├── .gitkeep                    # Keeps directory in git
 ├── README.md                   # This file
-├── custom-tls.conf.example     # Example for custom certificates
-└── custom-tls.conf             # Your custom config (gitignored)
+├── tls-snippet.conf.example    # Template for TLS snippet (tracked in git)
+├── tls-snippet.conf            # Your TLS config (gitignored, auto-created)
+└── *.conf                      # Your custom addons (gitignored)
 
 certs/
 ├── .gitkeep                    # Keeps directory in git
@@ -80,11 +78,24 @@ certs/
 └── wildcard.key                # Your private key (gitignored)
 ```
 
+## Adding Custom Addons
+
+You can create additional `.conf` files for custom Caddy configurations. They will be automatically loaded after the main Caddyfile.
+
+Example: `caddy-addon/custom-headers.conf`
+```caddy
+# Add custom headers to all responses
+(custom_headers) {
+    header X-Custom-Header "My Value"
+}
+```
+
 ## Important Notes
 
-- Files in `caddy-addon/*.conf` are gitignored (preserved during updates)
+- `tls-snippet.conf.example` is tracked in git (template with default Let's Encrypt behavior)
+- `tls-snippet.conf` is gitignored and auto-created from template (preserved during updates)
+- Other `*.conf` files are also gitignored (preserved during updates)
 - Files in `certs/` are gitignored (certificates are not committed)
-- Example files (`*.example`) are tracked in git
 - Caddy validates configuration on startup - check logs if it fails:
   ```bash
   docker compose -p localai logs caddy
