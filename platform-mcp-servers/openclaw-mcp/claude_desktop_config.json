@@ -1,0 +1,109 @@
+{
+  "mcpServers": {
+    "openclaw": {
+      "command": "node",
+      "args": [
+        "/home/node/Projects/tools/platform-mcp-servers/openclaw-mcp/index.js"
+      ],
+      "env": {
+        "OPENCLAW_GATEWAY_URL": "http://localhost:18789",
+        "OPENCLAW_GATEWAY_TOKEN": "YOUR_TOKEN_HERE",
+        "OPENCLAW_SESSION_KEY": "agent:main:main"
+      }
+    }
+  },
+  "_comment": "OpenClaw MCP Server Configuration Examples",
+  "_examples": {
+    "local": {
+      "description": "Connect to local OpenClaw gateway on default port",
+      "OPENCLAW_GATEWAY_URL": "http://localhost:18789"
+    },
+    "tailscale": {
+      "description": "Connect to OpenClaw gateway via Tailscale",
+      "OPENCLAW_GATEWAY_URL": "http://100.66.222.31:18789"
+    },
+    "cloudflare_tunnel": {
+      "description": "Connect to OpenClaw gateway via Cloudflare tunnel",
+      "OPENCLAW_GATEWAY_URL": "https://bot.holbrook.app"
+    },
+    "readonly_mode": {
+      "description": "Enable read-only mode (disables exec, write, edit)",
+      "OPENCLAW_READONLY": "true"
+    },
+    "specific_session": {
+      "description": "Pin all operations to a specific session",
+      "OPENCLAW_SESSION_KEY": "agent:main:main"
+    },
+    "dynamic_session": {
+      "description": "Let each tool call use its own session context",
+      "OPENCLAW_SESSION_KEY": "(omit this variable)"
+    }
+  },
+  "_setup_instructions": [
+    "1. Get your OpenClaw gateway token:",
+    "   - Check ~/.openclaw/config.toml for gateway.http.auth.tokens",
+    "   - Or generate one via OpenClaw Control UI",
+    "",
+    "2. Replace YOUR_TOKEN_HERE with your actual token",
+    "",
+    "3. Adjust OPENCLAW_GATEWAY_URL to match your setup:",
+    "   - Local: http://localhost:18789",
+    "   - LAN: http://192.168.50.24:18789",
+    "   - Tailscale: http://100.66.222.31:18789",
+    "   - Tunnel: https://bot.holbrook.app",
+    "",
+    "4. Optional: Set OPENCLAW_SESSION_KEY to pin to a specific agent/session",
+    "",
+    "5. Copy this entire 'openclaw' block to:",
+    "   macOS: ~/Library/Application Support/Claude/claude_desktop_config.json",
+    "   Windows: %APPDATA%/Claude/claude_desktop_config.json",
+    "   Linux: ~/.config/Claude/claude_desktop_config.json",
+    "",
+    "6. Restart Claude Desktop",
+    "",
+    "7. Test with: Ask Claude to run 'openclaw_health' tool"
+  ],
+  "_available_tools": [
+    "Core (6 tools):",
+    "  - openclaw_health: Check gateway health",
+    "  - openclaw_send: Send message to session/agent",
+    "  - openclaw_spawn: Spawn subagent for task",
+    "  - openclaw_sessions_list: List active sessions",
+    "  - openclaw_session_history: Get session history",
+    "  - openclaw_session_status: Get current session info",
+    "",
+    "Execution (4 tools):",
+    "  - openclaw_exec: Run shell commands",
+    "  - openclaw_read: Read file contents",
+    "  - openclaw_write: Write to files",
+    "  - openclaw_edit: Surgical file edits",
+    "",
+    "Browser (8 tools):",
+    "  - openclaw_browser_status: Browser status",
+    "  - openclaw_browser_open: Open URL",
+    "  - openclaw_browser_snapshot: Get page structure",
+    "  - openclaw_browser_screenshot: Capture screenshot",
+    "  - openclaw_browser_act: Click/type/interact",
+    "  - openclaw_browser_navigate: Navigate to URL",
+    "  - openclaw_browser_tabs: List open tabs",
+    "  - openclaw_browser_console: Get console output",
+    "",
+    "Nodes (7 tools):",
+    "  - openclaw_nodes_status: List paired devices",
+    "  - openclaw_nodes_notify: Send notifications",
+    "  - openclaw_nodes_camera: Take photos",
+    "  - openclaw_nodes_screen: Record screen",
+    "  - openclaw_nodes_location: Get GPS location",
+    "  - openclaw_nodes_run: Run commands on device",
+    "  - openclaw_nodes_invoke: Invoke device capability",
+    "",
+    "Workflows & Agents (4 tools):",
+    "  - openclaw_lobster_run: Run workflow pipeline",
+    "  - openclaw_lobster_resume: Resume/approve pipeline",
+    "  - openclaw_agents_list: List configured agents",
+    "  - openclaw_run_agent: Query agent (stateless)",
+    "",
+    "Advanced (1 tool):",
+    "  - openclaw_tool: Raw pass-through to any gateway tool"
+  ]
+}

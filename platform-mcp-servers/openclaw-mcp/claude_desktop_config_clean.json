@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "openclaw": {
+      "command": "node",
+      "args": [
+        "/home/node/Projects/tools/platform-mcp-servers/openclaw-mcp/index.js"
+      ],
+      "env": {
+        "OPENCLAW_GATEWAY_URL": "http://localhost:18789",
+        "OPENCLAW_GATEWAY_TOKEN": "YOUR_TOKEN_HERE"
+      }
+    }
+  }
+}
