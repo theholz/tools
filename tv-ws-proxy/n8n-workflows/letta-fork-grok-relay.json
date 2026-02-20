@@ -1,0 +1,171 @@
+{
+  "name": "Letta Fork → Grok Second Opinion",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "letta-fork",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-signal-input",
+      "name": "Webhook - Signal Input",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "letta-fork-signal"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalise - webhook body may be at .body or root\nconst raw = $input.first().json;\nconst signal = raw.body ?? raw;\nreturn [{ json: signal }];"
+      },
+      "id": "normalise-signal",
+      "name": "Normalise Signal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://supabase-kong:8000/rest/v1/tv_signals",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey",        "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3NjYyNjU4ODAsImV4cCI6MjA4MTYyNTg4MH0.F2Yg6e1fRhu6BBBnuLGGIReI0JTraQ9I193W7W6fvH8" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3NjYyNjU4ODAsImV4cCI6MjA4MTYyNTg4MH0.F2Yg6e1fRhu6BBBnuLGGIReI0JTraQ9I193W7W6fvH8" },
+            { "name": "Content-Type",  "value": "application/json" },
+            { "name": "Prefer",        "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ symbol: $json.symbol, timestamp: $json.timestamp, scores: $json.signals, raw_data: { price: $json.price, volume: $json.volume, change_pct: $json.change_pct, high: $json.high, low: $json.low, open: $json.open } }) }}"
+      },
+      "id": "supabase-tv-signals",
+      "name": "Supabase - Store Signal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 180]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build structured Grok prompt for second opinion\nconst signal = $('Normalise Signal').first().json;\n\nconst adxLabel = signal.signals?.adx?.value != null\n  ? `${Number(signal.signals.adx.value).toFixed(1)} (${signal.signals.adx.trend_strength})`\n  : 'n/a';\n\nconst chgPct = signal.change_pct != null ? Number(signal.change_pct).toFixed(2) : '?';\n\nconst promptText = [\n  'TRADING SIGNAL — Second Opinion Required',\n  '',\n  `Symbol:    ${signal.symbol}`,\n  `Price:     $${signal.price} (${signal.change_pct >= 0 ? '+' : ''}${chgPct}%)`,\n  `Timestamp: ${signal.timestamp}`,\n  '',\n  `PTOS  → ${(signal.signals?.ptos?.direction ?? 'N/A').toUpperCase()}  (score ${signal.signals?.ptos?.score ?? '?'})`,\n  `IADSS → ${(signal.signals?.iadss?.direction ?? 'N/A').toUpperCase()} (score ${signal.signals?.iadss?.score ?? '?'})`,\n  `ADX   → ${adxLabel}`,\n  `Pre-James action: ${signal.signals?.action ?? 'HOLD'}`,\n  '',\n  'Indicator detail:',\n  JSON.stringify(signal.signals, null, 2),\n  '',\n  'Rules (strict):',\n  '- 2-of-3 confluence required (PTOS + IADSS + James Score — you represent James Score)',\n  '- ADX >25 = strong trend | <20 = choppy, SKIP | >40 = exhaustion risk',\n  '- PTOS : RSI(14), MACD crossover, volume spike',\n  '- IADSS: BB squeeze/breakout, Ichimoku TK cross, Stochastic, ADX',\n  '- James: funding rate, BTC dominance, OI',\n  '',\n  'Reply: AGREE or DISAGREE + 1-2 sentence reason. No fluff.',\n].join('\\n');\n\nreturn [{ json: { promptText, originalSignal: signal } }];"
+      },
+      "id": "build-grok-prompt",
+      "name": "Build Grok Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8006/v1/responses",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'grok-3', input: [{ role: 'user', content: $json.promptText }], instructions: 'You are a trading signal validator enforcing a strict 2-of-3 confluence rule. Respond with AGREE or DISAGREE + 1-2 sentence reason. Be direct.' }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "grok-mcp-relay",
+      "name": "Grok via MCP Relay",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 420]
+    },
+    {
+      "parameters": {
+        "jsCode": "const grokResp     = $input.first().json;\nconst promptNode   = $('Build Grok Prompt').first().json;\n\nconst opinionText  = grokResp?.output?.[0]?.content?.[0]?.text\n  ?? grokResp?.output\n  ?? 'No response';\nconst opinionStr   = typeof opinionText === 'string' ? opinionText : JSON.stringify(opinionText);\n\nconst upper   = opinionStr.toUpperCase();\nconst verdict = upper.includes('DISAGREE') ? 'DISAGREE'\n              : upper.includes('AGREE')    ? 'AGREE'\n              : 'UNKNOWN';\n\nreturn [{ json: {\n  symbol:           promptNode.originalSignal.symbol,\n  signal_timestamp: promptNode.originalSignal.timestamp,\n  original_signal:  promptNode.originalSignal,\n  grok_opinion:     { output: opinionStr, raw: grokResp },\n  verdict\n} }];"
+      },
+      "id": "parse-grok-response",
+      "name": "Parse Grok Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://supabase-kong:8000/rest/v1/signal_opinions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey",        "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3NjYyNjU4ODAsImV4cCI6MjA4MTYyNTg4MH0.F2Yg6e1fRhu6BBBnuLGGIReI0JTraQ9I193W7W6fvH8" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3NjYyNjU4ODAsImV4cCI6MjA4MTYyNTg4MH0.F2Yg6e1fRhu6BBBnuLGGIReI0JTraQ9I193W7W6fvH8" },
+            { "name": "Content-Type",  "value": "application/json" },
+            { "name": "Prefer",        "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ symbol: $json.symbol, signal_timestamp: $json.signal_timestamp, original_signal: $json.original_signal, grok_opinion: $json.grok_opinion }) }}"
+      },
+      "id": "supabase-signal-opinions",
+      "name": "Supabase - Store Opinion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1340, 420]
+    },
+    {
+      "parameters": {
+        "jsCode": "const grokNode = $('Parse Grok Response').first().json;\nreturn [{ json: {\n  ok:      true,\n  symbol:  grokNode.symbol,\n  verdict: grokNode.verdict,\n  opinion: grokNode.grok_opinion?.output?.substring(0, 300),\n  ts:      new Date().toISOString()\n} }];"
+      },
+      "id": "merge-results",
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Signal Input": {
+      "main": [
+        [{ "node": "Normalise Signal", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalise Signal": {
+      "main": [
+        [
+          { "node": "Supabase - Store Signal", "type": "main", "index": 0 },
+          { "node": "Build Grok Prompt",       "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Supabase - Store Signal": {
+      "main": [
+        [{ "node": "Merge Results", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Grok Prompt": {
+      "main": [
+        [{ "node": "Grok via MCP Relay", "type": "main", "index": 0 }]
+      ]
+    },
+    "Grok via MCP Relay": {
+      "main": [
+        [{ "node": "Parse Grok Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Grok Response": {
+      "main": [
+        [{ "node": "Supabase - Store Opinion", "type": "main", "index": 0 }]
+      ]
+    },
+    "Supabase - Store Opinion": {
+      "main": [
+        [{ "node": "Merge Results", "type": "main", "index": 1 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

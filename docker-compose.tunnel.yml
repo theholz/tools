@@ -1,0 +1,9 @@
+services:
+  tunnel:
+    image: alpine:latest
+    container_name: mac-tunnel
+    restart: always
+    command: /bin/sh -c "apk add --no-cache autossh openssh-client && mkdir -p /root/.ssh && chmod 700 /root/.ssh && cp /id_rsa /root/.ssh/id_rsa && chmod 600 /root/.ssh/id_rsa && autossh -M 0 -o 'ServerAliveInterval 30' -o 'ServerAliveCountMax 3' -o 'StrictHostKeyChecking no' -N -L 3006:localhost:3006 -L 2222:localhost:22 -i /root/.ssh/id_rsa Apple@192.168.50.24"
+    volumes:
+      - /home/tait/.ssh/id_ed25519:/id_rsa:ro
+    network_mode: host

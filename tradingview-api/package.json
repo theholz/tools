@@ -1,0 +1,39 @@
+{
+  "name": "tradingview-api",
+  "version": "1.0.0",
+  "description": "Stable REST API for TradingView automation using Playwright",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "jest",
+    "test:automation": "tsx tests/test-automation-suite.ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "tradingview",
+    "automation",
+    "playwright",
+    "api"
+  ],
+  "author": "IA Trading Coach",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.87.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0",
+    "playwright": "^1.45.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.7.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

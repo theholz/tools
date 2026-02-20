@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+:root {
+  --color-bg:        #131722;
+  --color-surface:   #1e2230;
+  --color-surface-2: #1a1e2e;
+  --color-border:    #2a2e39;
+  --color-text:      #d1d4dc;
+  --color-muted:     #787b86;
+  --color-accent:    #2962ff;
+  --color-accent-h:  #1e4fd8;
+  --color-green:     #26a69a;
+  --color-red:       #ef5350;
+
+  --copilot-kit-primary-color:    var(--color-accent);
+  --copilot-kit-background-color: var(--color-bg);
+  --copilot-kit-separator-color:  var(--color-border);
+  --copilot-kit-font-family:      -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  width: 100%; height: 100%;
+  margin: 0; padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--copilot-kit-font-family);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar       { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 2px; }
+
+/* Force dark theme on CopilotKit components */
+.copilotKitSidebarContentWrapper,
+.copilotKitChat,
+.copilotKitMessages {
+  background: var(--color-bg) !important;
+  color: var(--color-text) !important;
+}
+.copilotKitAssistantMessage .copilotKitMarkdown {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 12px !important;
+  padding: 10px 14px !important;
+  color: var(--color-text) !important;
+}
+.copilotKitUserMessage > div {
+  background: var(--color-accent) !important;
+  border-radius: 12px !important;
+  color: white !important;
+}
+.copilotKitInputControls textarea {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 10px !important;
+  color: var(--color-text) !important;
+}
+.copilotKitInputControls textarea::placeholder {
+  color: var(--color-muted) !important;
+}
+.copilotKitHeader {
+  background: var(--color-surface) !important;
+  border-bottom: 1px solid var(--color-border) !important;
+}

@@ -21,3 +21,20 @@ certs/*
 # Custom Caddy addons (user configurations)
 caddy-addon/*.conf
 !caddy-addon/*.example
+
+# Local IDE/AI config (may contain secrets)
+.kilocode/mcp.json
+
+# Node.js
+node_modules/
+
+# Python
+__pycache__/
+.venv/
+venv/
+*.pyc
+
+# Build outputs
+dist/
+.next/
+build/

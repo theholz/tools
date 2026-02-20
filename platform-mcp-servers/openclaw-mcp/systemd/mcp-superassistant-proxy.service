@@ -1,0 +1,18 @@
+[Unit]
+Description=MCP SuperAssistant proxy for Grok/browser (SSE)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# nvm Node (20.19+ for chrome-devtools-mcp). PATH must be set so proxy's child processes (node, npx) find it.
+Environment=HOME=%h
+Environment=PATH=%h/.nvm/versions/node/v24.13.0/bin:/usr/bin:/bin
+ExecStart=%h/.nvm/versions/node/v24.13.0/bin/npx --yes @srbhptl39/mcp-superassistant-proxy@latest --config %h/Projects/config-superassistant.grok.json --outputTransport sse --port 8006
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

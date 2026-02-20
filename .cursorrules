@@ -1,0 +1,177 @@
+**Version:** 3.0
+**Last Updated:** 2026-01-28
+
+- **Memory Bank** - Project context stored in memory-bank/*.md files
+- **6-Phase Process** - VAN → ARCHITECT → PLAN → QA → ACT → REVIEW
+- **OPA Policies** - Enforcement at phase gates (opa/policies/)
+
+## CRITICAL: Framework Location
+
+**Extended rules are in `framework/` directory:**
+- `framework/rules/` - Detailed Cursor rules (.mdc files)
+- `framework/methodology/` - Biswas patterns, decision-making, phases
+- `framework/config/` - Configuration files (MCP selection, community nodes)
+- `framework/kilocode-skills/` - Kilocode agent skill packages (symlink to ~/.kilocode/skills); use when working on crawl4ai, n8n, MCP building, file-organizer, webapp-testing (see framework/rules/kilocode-skills.mdc)
+- `opa/policies/` - OPA enforcement policies
+
+## CRITICAL: Memory Bank Verification (VAN Mode)
+
+**Before ANY operation, verify Memory Bank exists:**
+
+```
+memory-bank/
+├── projectbrief.md      # Project overview and goals
+├── productContext.md    # Product vision and constraints
+├── systemPatterns.md    # System design patterns
+├── techContext.md       # Technical stack and dependencies
+├── activeContext.md     # Current focus and status
+└── progress.md          # Implementation progress
+
+tasks.md                 # Source of truth for tasks
+```
+
+If Memory Bank doesn't exist, create it first.
+
+## Session Start - Always
+
+1. **VAN Mode** - Verify environment, determine complexity (Level 1-4)
+2. **Read Memory Bank** - Load context from memory-bank/*.md files
+3. **Check Active Context** - Review memory-bank/activeContext.md for current state
+4. **Review Tasks** - Check tasks.md for active work
+
+## Development Phases
+
+### Phase 0: VAN (Verify, Analyze, Navigate)
+- Verify Memory Bank exists
+- Detect platform (Linux/Mac/Windows)
+- Determine task complexity (Level 1-4)
+- Route to correct phase
+
+### Phase 1: ARCHITECT
+- Load product context from memory-bank/productContext.md
+- Perform feasibility analysis
+- Define acceptance criteria
+- Update memory-bank/activeContext.md
+
+### Phase 2: PLAN
+- Break down into tasks
+- Update tasks.md
+- Map dependencies
+- Update memory-bank/progress.md
+
+### Phase 3: QA VALIDATION (Cannot Skip)
+- Verify dependencies installed
+- Validate configuration
+- Check environment
+- Run minimal build test
+
+### Phase 4: ACT
+- Search for existing solutions first
+- Follow tool priority (see below)
+- Implement following systemPatterns.md
+- Write tests
+- Update progress
+
+### Phase 5: REVIEW
+- Verify acceptance criteria
+- All tests passing
+- Documentation complete
+- Request user approval
+
+## Tool Priority (MANDATORY)
+
+**CRITICAL: Follow this priority order. NEVER skip to custom code.**
+
+1. **Existing n8n workflows** - Check first with `Makafeli: list_workflows`
+2. **Native n8n nodes** - Use `FlowEngine: search_nodes` to find
+3. **Community n8n nodes** - Check `framework/config/n8n/community-nodes-registry.json`
+4. **MCP tools** - FlowEngine (design) or Makafeli (runtime)
+5. **Cursor built-in tools** - File operations, search, etc.
+6. **Custom code** - LAST RESORT - requires justification
+
+## n8n Workflow Building (CRITICAL)
+
+**You have TWO n8n MCP tools - use the RIGHT one:**
+
+| Task | MCP Tool | Examples |
+|------|----------|----------|
+| Design-time (build, edit, validate) | **FlowEngine** | build_workflow, add_node, validate_workflow |
+| Runtime (deploy, execute, manage) | **Makafeli** | create_workflow, activate_workflow, execute_workflow |
+
+**Standard workflow building process:**
+1. `FlowEngine: suggest_architecture` - Get pattern
+2. `FlowEngine: build_workflow` - Generate workflow
+3. `FlowEngine: validate_workflow` - Validate
+4. `FlowEngine: scan_security` - Security check
+5. `Makafeli: create_workflow` - Deploy
+6. `Makafeli: activate_workflow` - Enable
+7. `Makafeli: execute_workflow` - Test
+8. `Makafeli: get_execution` - Verify success
+
+**Node selection priority:**
+1. Native n8n nodes (HTTP Request, Postgres, etc.)
+2. Community nodes (Supercode, Firecrawl, etc.)
+3. MCP Client node (for MCP integrations)
+4. Supercode node (NOT regular Code node)
+
+**NEVER use regular Code node - use Supercode instead:**
+- More libraries (axios, lodash, moment)
+- Better error handling
+- Multiple modes - ALWAYS set correct mode!
+
+See `framework/rules/n8n-workflow-building.mdc` for complete guide.
+
+## Container Rules
+
+**IMPORTANT: Always use `docker compose` (with space)**
+
+```bash
+# Correct
+docker compose up -d
+docker compose down
+docker compose logs service-name
+docker compose ps
+
+# INCORRECT - Never use these
+docker-compose up  # Wrong - hyphenated version
+podman ...         # Wrong - we don't use podman
+```
+
+## Memory Bank Updates
+
+After significant changes, update relevant memory-bank files:
+- `activeContext.md` - Current focus and status
+- `progress.md` - What's been completed
+- `tasks.md` - Task status changes
+
+## Output Format (Metacognition)
+
+When making decisions, include:
+- Confidence level (0-1)
+- Reasoning (3+ factors)
+- Risks identified
+- Fallback plan if applicable
+
+**Escalation thresholds:**
+- < 0.60: ESCALATE to human
+- 0.60-0.74: PENDING human review
+- 0.75+: Can auto-proceed
+
+## OPA Policy Enforcement
+
+Run policy checks at phase gates:
+```bash
+python scripts/enforcement/run-opa-check.py --policy van_initialization --auto
+python scripts/enforcement/run-opa-check.py --policy phase_gate --phase PLAN
+python scripts/enforcement/validate-n8n-workflow.sh workflow.json
+```
+
+## Remember
+
+- Start with VAN mode - verify environment first
+- Stay in phase, follow gates
+- Update Memory Bank regularly
+- Express uncertainty when appropriate
+- Use n8n workflows before custom code
+- Use Supercode, not regular Code node
+- Docker Compose only, no podman

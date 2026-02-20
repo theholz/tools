@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>TV Copilot Settings</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 300px;
+      background: #131722;
+      color: #d1d4dc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      padding: 16px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #2a2e39;
+    }
+    .header .logo { font-size: 22px; }
+    .header h1 { font-size: 15px; font-weight: 600; color: #d1d4dc; }
+    .header p { font-size: 11px; color: #787b86; }
+    label {
+      display: block;
+      color: #787b86;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      margin-top: 14px;
+    }
+    input {
+      width: 100%;
+      background: #1e2230;
+      border: 1px solid #2a2e39;
+      border-radius: 6px;
+      color: #d1d4dc;
+      padding: 8px 10px;
+      font-size: 12px;
+      outline: none;
+      font-family: 'Menlo', monospace;
+    }
+    input:focus { border-color: #2962ff; }
+    .hint {
+      font-size: 10px;
+      color: #4a4e5a;
+      margin-top: 4px;
+    }
+    button {
+      width: 100%;
+      margin-top: 18px;
+      background: #2962ff;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #1e4fd8; }
+    .status {
+      margin-top: 10px;
+      font-size: 12px;
+      text-align: center;
+      min-height: 20px;
+    }
+    .status.ok { color: #26a69a; }
+    .status.err { color: #ef5350; }
+    .token-hint {
+      margin-top: 14px;
+      padding: 10px;
+      background: #1a1e2e;
+      border: 1px solid #2a2e39;
+      border-radius: 6px;
+      font-size: 11px;
+      color: #787b86;
+      line-height: 1.6;
+    }
+    .token-hint code {
+      color: #26a69a;
+      background: #131722;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-family: 'Menlo', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">🤖</div>
+    <div>
+      <h1>TV Copilot</h1>
+      <p>OpenClaw × TradingView</p>
+    </div>
+  </div>
+
+  <label>Gateway URL</label>
+  <input type="text" id="gateway_url" placeholder="http://192.168.50.52:18789">
+  <div class="hint">Your OpenClaw gateway address</div>
+
+  <label>Device Token</label>
+  <input type="password" id="clawg_token" placeholder="paste your bearer token...">
+  <div class="hint">Get this by pairing below</div>
+
+  <button id="save">Save Settings</button>
+  <div class="status" id="status"></div>
+
+  <div class="token-hint">
+    <strong>First time?</strong> Pair a new device:<br>
+    1. Run: <code>curl -X POST &lt;gateway&gt;/v1/clawg-ui -H "Content-Type: application/json" -d '{}'</code><br>
+    2. Approve: <code>openclaw pairing approve clawg-ui &lt;CODE&gt;</code><br>
+    3. Paste the token above.
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

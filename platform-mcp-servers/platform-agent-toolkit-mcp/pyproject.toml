@@ -1,0 +1,21 @@
+[project]
+name = "platform-agent-toolkit-mcp"
+version = "1.0.0"
+description = "MCP Server for Letta + Google Workspace (Gmail, Calendar, Drive, Tasks, Sheets, Docs, Slides)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp",
+    "httpx",
+    "pydantic",
+    "google-api-python-client",
+    "google-auth",
+    "google-auth-oauthlib",
+    "google-auth-httplib2",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

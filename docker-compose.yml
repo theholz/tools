@@ -35,6 +35,7 @@ volumes:
   ragflow_redis_data:
   temporal_elasticsearch_data:
   valkey-data:
+  tradingview_data:
   weaviate_data:
 
 # Shared logging configuration for services
@@ -144,6 +145,102 @@ x-n8n-worker-runner: &service-n8n-worker-runner
     N8N_RUNNERS_TASK_BROKER_URI: http://127.0.0.1:5679
 
 services:
+  tradingview-api:
+    build:
+      context: ./tradingview-api
+      dockerfile: Dockerfile
+    container_name: tradingview-api
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    environment:
+      <<: *proxy-env
+      PORT: 8084
+      HEADLESS: "true"
+      AUTO_CONNECT: "false"
+      LOG_LEVEL: info
+      SUPABASE_URL: "http://supabase-kong:8000"
+      SUPABASE_SERVICE_KEY: "${SERVICE_ROLE_KEY}"
+      N8N_WEBHOOK_URL: "${TV_WEBHOOK_N8N_URL:-}"
+      DEFAULT_WEBHOOK_URL: "${DEFAULT_WEBHOOK_URL:-}"
+      TRADINGVIEW_USERNAME: "${TRADINGVIEW_USERNAME}"
+      TRADINGVIEW_PASSWORD: "${TRADINGVIEW_PASSWORD}"
+      TRADINGVIEW_TOTP_SECRET: "${TRADINGVIEW_TOTP_SECRET}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - tradingview_data:/app/data
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8084/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  tv-ws-proxy:
+    build:
+      context: ./tv-ws-proxy
+      dockerfile: Dockerfile
+    container_name: tv-ws-proxy
+    restart: unless-stopped
+    profiles: ["trading"]
+    ports:
+      - "8085:8085"
+    environment:
+      <<: *proxy-env
+      TRADINGVIEW_USERNAME: "${TRADINGVIEW_USERNAME}"
+      TRADINGVIEW_PASSWORD: "${TRADINGVIEW_PASSWORD}"
+      TRADINGVIEW_TOTP_SECRET: "${TRADINGVIEW_TOTP_SECRET}"
+      SUPABASE_URL: "http://supabase-kong:8000"
+      SUPABASE_SERVICE_KEY: "${SERVICE_ROLE_KEY}"
+      N8N_WEBHOOK_URL: "${TV_WEBHOOK_N8N_URL:-}"
+      GROK_WEBHOOK_URL: "${GROK_WEBHOOK_URL:-}"
+      TV_SYMBOLS: "${TV_SYMBOLS:-BINANCE:SOLUSDT,BINANCE:JUPUSDT}"
+      SYMBOLS: "${TV_SYMBOLS:-BINANCE:SOLUSDT,BINANCE:JUPUSDT}"
+      BINANCE_FUTURES_SYMBOLS: "${BINANCE_FUTURES_SYMBOLS:-SOLUSDT,BTCUSDT,ETHUSDT}"
+      INDICATORS: "${TV_INDICATORS:-PTOS,IADSS}"
+      COINGLASS_API_KEY: "${COINGLASS_API_KEY:-}"
+      FINNHUB_API_KEY: "${FINNHUB_API_KEY:-}"
+      PERPLEXITY_API_KEY: "${PERPLEXITY_API_KEY:-}"
+      HEALTH_PORT: "8085"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8085/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  tts-proxy:
+    build:
+      context: ./tts-proxy
+      dockerfile: Dockerfile
+    container_name: tts-proxy
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      <<: *proxy-env
+      ELEVENLABS_API_KEY: "${ELEVENLABS_API_KEY}"
+      ELEVENLABS_VOICE_ID: "${ELEVENLABS_VOICE_ID:-SAz9YHcvj6GT2YYXdXww}"
+      ELEVENLABS_MODEL_ID: "${ELEVENLABS_MODEL_ID:-eleven_turbo_v2_5}"
+      TTS_PROXY_TOKEN: "${OPENCLAW_GATEWAY_TOKEN}"
+      OPENCLAW_GATEWAY_URL: "http://host.docker.internal:18789"
+      OPENCLAW_GATEWAY_TOKEN: "${OPENCLAW_GATEWAY_TOKEN}"
+      PORT: "8086"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8086/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   flowise:
     image: flowiseai/flowise
     restart: unless-stopped
@@ -566,7 +663,7 @@ services:
       SEARXNG_BASE_URL: https://${SEARXNG_HOSTNAME:-localhost}/
       UWSGI_WORKERS: ${SEARXNG_UWSGI_WORKERS:-4}
       UWSGI_THREADS: ${SEARXNG_UWSGI_THREADS:-4}
-    # cap_drop: - ALL  # Temporarily commented out for first run
+    # # # # cap_drop: - ALL  # Temporarily commented out for first run  # Temporarily commented out for first run  # Temporarily commented out for first run  # Temporarily commented out for first run
     cap_add:
       - CHOWN
       - SETGID

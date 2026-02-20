@@ -1,0 +1,18 @@
+services:
+  syncthing:
+    image: syncthing/syncthing
+    container_name: syncthing
+    restart: unless-stopped
+    environment:
+      - PUID=0
+      - PGID=0
+    volumes:
+      - ./syncthing_data:/var/syncthing
+      - /home/tait/Projects:/var/syncthing/Projects
+      - /home/tait/Documents/obsidian:/var/syncthing/obsidian
+    ports:
+      - 8384:8384
+      - 22000:22000/tcp
+      - 22000:22000/udp
+      - 21027:21027/udp
+    profiles: ["tools"]

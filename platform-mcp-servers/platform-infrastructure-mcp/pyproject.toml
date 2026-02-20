@@ -1,0 +1,22 @@
+[project]
+name = "platform-infrastructure-mcp"
+version = "1.0.0"
+description = "MCP Server for Infrastructure tools (12 tools)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp",
+    "httpx",
+    "pydantic",
+    "neo4j",
+    "asyncpg",
+    "qdrant-client",
+    "redis",
+    "PyGithub",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

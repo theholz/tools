@@ -1,0 +1,21 @@
+[project]
+name = "platform-financial-mcp"
+version = "1.0.0"
+description = "MCP Server for Financial data tools (10 tools)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp",
+    "httpx",
+    "pydantic",
+    "requests",
+    "yfinance",
+    "numpy",
+    "ta-lib",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

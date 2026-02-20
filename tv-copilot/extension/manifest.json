@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "TV Copilot — OpenClaw",
+  "version": "1.1.0",
+  "description": "AI trading assistant powered by your local OpenClaw agent. Context-aware chat overlay for TradingView charts.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.tradingview.com/*",
+    "http://localhost:18789/*",
+    "http://localhost:8084/*",
+    "http://192.168.50.52:18789/*",
+    "http://192.168.50.52:8084/*",
+    "http://192.168.50.52:8085/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.tradingview.com/chart/*"],
+      "js": ["content.js"],
+      "css": ["sidebar.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "TV Copilot Settings"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["sidebar.html", "sidebar.js", "*.css", "*.js"],
+      "matches": ["https://www.tradingview.com/*"]
+    }
+  ]
+}

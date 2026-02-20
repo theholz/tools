@@ -1,0 +1,115 @@
+{
+  "name": "Letta Payload Fork → Grok Second Opinion",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "letta-fork",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-in",
+      "name": "Signal Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build structured Grok prompt from signal payload\nconst signal = $input.first().json;\n\nconst scores = signal.scores || signal.indicators || {};\nconst adx = scores.adx ?? scores.ADX ?? 'n/a';\nconst adxContext = typeof adx === 'number'\n  ? adx > 40 ? '⚠️ Possible exhaustion (>40)'\n  : adx > 25 ? '✅ Strong trend confirmed (>25)'\n  : adx < 20 ? '❌ Choppy market (<20) — skip signal'\n  : 'Moderate'\n  : 'n/a';\n\nconst prompt = `TRADING SIGNAL — Second Opinion Required\n\nSymbol: ${signal.symbol}\nTimestamp: ${signal.timestamp}\n\nScores:\n${JSON.stringify(scores, null, 2)}\n\nADX Reading: ${adx} → ${adxContext}\n\nConfluence Rules (2-of-3 required):\n• PTOS: RSI(14), MACD crossover, volume spike\n• IADSS: BB squeeze/breakout, Ichimoku cross, Stochastic, ADX\n• James Score: funding rate, BTC dominance, OI\n\nRespond with exactly: AGREE or DISAGREE\nThen 1-2 sentences explaining which confluence signals support your verdict and any red flags.`;\n\nreturn [{ json: { prompt, signal } }];"
+      },
+      "id": "build-prompt",
+      "name": "Build Grok Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GROK_MCP_RELAY_URL || 'http://host.docker.internal:8006/v1/responses' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "Bearer {{ $env.MCP_AUTH_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'grok-3', input: $json.prompt, instructions: 'You are a trading analyst evaluating signals from PTOS, IADSS, and James Score systems. Be concise and direct.' }) }}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "grok-relay",
+      "name": "Grok MCP Relay",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL || 'http://supabase-kong:8000' }}/rest/v1/signal_opinions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ signal_timestamp: $('Build Grok Prompt').first().json.signal.timestamp, symbol: $('Build Grok Prompt').first().json.signal.symbol, original_signal: $('Build Grok Prompt').first().json.signal, grok_opinion: $json, created_at: new Date().toISOString() }) }}",
+        "options": {}
+      },
+      "id": "store-opinion",
+      "name": "Store Opinion (Supabase)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.TV_PRODUCTION_WEBHOOK_URL || $env.TV_WEBHOOK_N8N_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Signal Webhook').first().json) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "prod-passthrough",
+      "name": "Production Path (passthrough)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 420]
+    }
+  ],
+  "connections": {
+    "Signal Webhook": {
+      "main": [
+        [
+          { "node": "Build Grok Prompt", "type": "main", "index": 0 },
+          { "node": "Production Path (passthrough)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Build Grok Prompt": {
+      "main": [
+        [{ "node": "Grok MCP Relay", "type": "main", "index": 0 }]
+      ]
+    },
+    "Grok MCP Relay": {
+      "main": [
+        [{ "node": "Store Opinion (Supabase)", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": false,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": [{ "name": "trading" }, { "name": "letta-fork" }]
+}
